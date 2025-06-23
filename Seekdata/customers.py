@@ -1,10 +1,23 @@
 import sqlite3
+import pandas as pd
 
-# 1. Connect (or create) the database file
+# === 1. Load data from Excel ===
+# adjust the path to wherever your file is
+excel_path = "customers.xlsx"
+df = pd.read_excel(excel_path)
+
+# ensure these columns exist in your sheet:
+# ['CustomerCode', 'FullName', 'Role', 'SuperiorCode']
+expected = {"CustomerCode","FullName","Role","SuperiorCode"}
+if not expected.issubset(df.columns):
+    missing = expected - set(df.columns)
+    raise RuntimeError(f"Missing columns in Excel: {missing}")
+
+# === 2. Connect to (or create) the database ===
 conn = sqlite3.connect("sales.db")
 cur  = conn.cursor()
 
-# 2. Create the table with CustomerCode, FullName, Role and SuperiorCode
+# === 3. Create the table if it doesn't exist ===
 cur.execute("""
 CREATE TABLE IF NOT EXISTS customers (
     CustomerCode TEXT PRIMARY KEY,
@@ -14,25 +27,20 @@ CREATE TABLE IF NOT EXISTS customers (
 )
 """)
 
-# 3. Seed exactly your sample data
-sample_customers = [
-    ("NV001", "Nguyen Van A", "Catalyst",    "NV003"),
-    ("NV002", "Tran Thi B",   "Catalyst",    "NV003"),
-    ("NV003", "Le Van C",     "Visionary",   "NV007"),
-    ("NV004", "Pham Thi D",   "Visionary",   "NV007"),
-    ("NV005", "Vu Van E",     "Catalyst",    "NV004"),
-    ("NV006", "Hoang Thi F",  "Catalyst",    "NV004"),
-    ("NV007", "Dang Van G",   "Trailblazer", None),
-]
+# === 4. Seed from the DataFrame ===
+# Convert to a list of tuples
+records = df[["CustomerCode","FullName","Role","SuperiorCode"]].itertuples(
+    index=False, name=None
+)
 
 cur.executemany("""
     INSERT OR REPLACE INTO customers
       (CustomerCode, FullName, Role, SuperiorCode)
     VALUES (?, ?, ?, ?)
-""", sample_customers)
+""", records)
 
-# 4. Commit & close
+# === 5. Commit & clean up ===
 conn.commit()
 conn.close()
 
-print("✅ sales.db created/updated and customers table seeded with hierarchy data.")
+print("✅ sales.db updated from Excel source!") 

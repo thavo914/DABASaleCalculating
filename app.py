@@ -1,6 +1,19 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import sqlite3
+import requests
+import tempfile
+
+@st.cache_resource
+def get_connection():
+    url = "https://raw.githubusercontent.com/thavo914/DABASaleCalculating/main/sales.db"
+    r = requests.get(url)
+    r.raise_for_status()
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.write(r.content)
+    tmp.flush()
+    return sqlite3.connect(tmp.name, check_same_thread=False)
 
 # --- Your commission logic ---
 def calculate_OverrideSales(df):
@@ -35,13 +48,39 @@ st.title("💼 Sales & Commission Calculator")
 # File uploader
 uploaded = st.file_uploader("Upload your sales Excel", type=['xlsx','xls'])
 if uploaded:
-    df = pd.read_excel(uploaded)
-    st.subheader("Raw Data")
-    st.dataframe(df)
+    df_sales = pd.read_excel(uploaded)
+    st.subheader("Sales Data")
+    st.dataframe(df_sales)
 
     if st.button("Compute Commissions"):
         with st.spinner("Calculating…"):
-            result = compute_commissions(df)
+            try:
+                conn = get_connection()
+                df_customers = pd.read_sql_query("SELECT * FROM customers", conn)
+                st.subheader("Customer Data")
+                st.dataframe(df_customers)
+                df_merged = pd.merge(
+                    df_customers,
+                    df_sales,
+                    on="CustomerCode",
+                    how="inner",
+                    suffixes=("_cust","_sales")
+                    # (each customer can have multiple sales rows; you can also use "one_to_one" or "many_to_many")
+                )
+                # st.dataframe(df_merged)
+                # df_final = (
+                # df_merged
+                # [["CustomerCode","FullName_cust", "Role_cust", "SuperiorCode_cust","Sales"]]
+                # .rename(columns={
+                #     "FullName_cust":"FullName",
+                #     "Role_cust":"Role",
+                #     "SuperiorCode_cust":"SuperiorCode",
+                # })
+                # )
+                # st.dataframe(df_merged)
+            except Exception as e:
+                st.error(f"Error loading data from GitHub: {str(e)}")
+            result = compute_commissions(df_merged)
         st.success("Done!")
         st.subheader("With Commissions")
         st.dataframe(result)
