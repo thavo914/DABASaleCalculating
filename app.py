@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import sqlite3
 import requests
 import tempfile
+from io import BytesIO
 
 @st.cache_resource
 def get_connection():
@@ -41,6 +42,7 @@ def compute_commissions(df):
     df['PersonalComm'] = df['Sales'] * df['CommissionRate']
     df['OverrideComm'] = df['OverrideSales'] * df['OverrideRate']
     return df
+
 
 # --- Streamlit UI ---
 st.title("💼 Sales & Commission Calculator")
@@ -84,6 +86,20 @@ if uploaded:
         st.success("Done!")
         st.subheader("With Commissions")
         st.dataframe(result)
+
+        # — Download button —
+        buffer = BytesIO()
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            result.to_excel(writer, index=False, sheet_name="Commissions")
+            writer.close()
+        buffer.seek(0)
+
+        st.download_button(
+            label="📥 Download results as Excel",
+            data=buffer,
+            file_name="commission_results.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
         # Summary metrics
         total_sales   = result['Sales'].sum()
