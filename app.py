@@ -37,7 +37,7 @@ uploaded = st.file_uploader("Upload your sales Excel", type=['xlsx','xls'])
 if uploaded:
     df_sales = pd.read_excel(uploaded)
     st.subheader("Sales Data")
-    paginated_dataframe(df_sales, "sales_page")
+    st.dataframe(df_sales)
 
     if st.button("Compute Commissions"):
         with st.spinner("Calculating…"):
@@ -45,7 +45,7 @@ if uploaded:
                 df_merged = pd.merge(
                     df_customers,
                     df_sales,
-                    on="CustomerCode",
+                    on="customercode",
                     how="inner",
                     suffixes=("_cust","_sales")
                     # (each customer can have multiple sales rows; you can also use "one_to_one" or "many_to_many")
