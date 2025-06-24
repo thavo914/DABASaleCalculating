@@ -3,17 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sqlite3
 import requests
-import tempfile
-from io import BytesIO
-
-@st.cache_resource
-def get_connection():
-    url = "https://raw.githubusercontent.com/thavo914/DABASaleCalculating/main/sales.db"
-    r = requests.get(url)
-    r.raise_for_status()
-    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-    tmp.write(r.content)
-    tmp.flush()
+impo
     return sqlite3.connect(tmp.name, check_same_thread=False)
 
 # --- Your commission logic ---
