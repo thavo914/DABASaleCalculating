@@ -1,44 +1,40 @@
-# app.py
-import streamlit as st
-import sqlite3
-import pandas as pd
-import requests
-import tempfile
+import psycopg2
+from dotenv import load_dotenv
+import os
 
-@st.cache_resource
-def get_connection():
-    url = "https://raw.githubusercontent.com/thavo914/DABASaleCalculating/main/sales.db"
-    r   = requests.get(url)
-    r.raise_for_status()
-    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-    tmp.write(r.content)
-    tmp.flush()
-    return sqlite3.connect(tmp.name, check_same_thread=False)
+# Load environment variables from .env
+load_dotenv()
 
-@st.cache_data
-def load_customers() -> pd.DataFrame:
-    conn = get_connection()
-    return pd.read_sql_query("SELECT * FROM customers", conn)
+# Fetch variables
+USER = os.getenv("user")
+PASSWORD = os.getenv("password")
+HOST = os.getenv("host")
+PORT = os.getenv("port")
+DBNAME = os.getenv("dbname")
 
-def main():
-    st.title("🗄️ Customers from sales.db")
-    df = load_customers()
-    st.subheader("All Customers")
-    st.dataframe(df)
-
-    st.subheader("🔍 Run Ad-Hoc SQL")
-    sql = st.text_area(
-        "Enter a SELECT query",
-        value="SELECT * FROM customers LIMIT 5;"
+# Connect to the database
+try:
+    connection = psycopg2.connect(
+        user=USER,
+        password=PASSWORD,
+        host=HOST,
+        port=PORT,
+        dbname=DBNAME
     )
-    if st.button("Run"):
-        try:
-            conn = get_connection()
-            df_q = pd.read_sql_query(sql, conn)
-            st.success(f"Returned {len(df_q)} rows")
-            st.dataframe(df_q)
-        except Exception as e:
-            st.error(f"Query failed: {e}")
+    print("Connection successful!")
+    
+    # Create a cursor to execute SQL queries
+    cursor = connection.cursor()
+    
+    # Example query
+    cursor.execute("SELECT NOW();")
+    result = cursor.fetchone()
+    print("Current Time:", result)
 
-if __name__ == "__main__":
-    main()
+    # Close the cursor and connection
+    cursor.close()
+    connection.close()
+    print("Connection closed.")
+
+except Exception as e:
+    print(f"Failed to connect: {e}")

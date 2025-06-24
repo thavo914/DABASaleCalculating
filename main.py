@@ -1,66 +1,43 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import sqlite3
-import requests
-import tempfile
 from io import BytesIO
-
-@st.cache_resource
-def get_connection():
-    url = "https://raw.githubusercontent.com/thavo914/DABASaleCalculating/main/sales.db"
-    r = requests.get(url)
-    r.raise_for_status()
-    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-    tmp.write(r.content)
-    tmp.flush()
-    return sqlite3.connect(tmp.name, check_same_thread=False)
-
-# --- Your commission logic ---
-def calculate_OverrideSales(df):
-    df['OverrideSales'] = 0
-    for role in ['Catalyst', 'Visionary', 'Trailblazer']:
-        role_staff = df[df['Role'] == role]
-        for _, staff in role_staff.iterrows():
-            subs = df['SuperiorCode'] == staff['CustomerCode']
-            subordinate_sales = df.loc[subs, 'Sales'].sum()
-            subordinate_override = df.loc[subs, 'OverrideSales'].sum()
-            total_override = subordinate_sales + subordinate_override
-            df.loc[df['CustomerCode'] == staff['CustomerCode'], 'OverrideSales'] = total_override
-    return df
-
-network = {
-    'Catalyst':    {'comm_rate': .35, 'override_rate': 0,   'level': 1},
-    'Visionary':   {'comm_rate': .4,  'override_rate': .05,'level': 2},
-    'Trailblazer': {'comm_rate': .4,  'override_rate': .05,'level': 3},
-}
-
-def compute_commissions(df):
-    df = calculate_OverrideSales(df)
-    df['CommissionRate']     = df['Role'].map(lambda r: network[r]['comm_rate'])
-    df['OverrideRate']     = df['Role'].map(lambda r: network[r]['override_rate'])
-    df['PersonalComm'] = df['Sales'] * df['CommissionRate']
-    df['OverrideComm'] = df['OverrideSales'] * df['OverrideRate']
-    return df
+from database import get_connection
+from commission import compute_commissions
+from ui import paginated_dataframe
 
 
 # --- Streamlit UI ---
 st.title("💼 Sales & Commission Calculator")
+
+conn = get_connection()
+df_customers = pd.read_sql_query("""
+    SELECT c.customercode, c.fullname, r.rolename, c.superiorcode
+    , c2.fullname AS superiorname
+    FROM public.customers c
+    INNER JOIN roles r ON c.roleid = r.id
+    LEFT JOIN public.customers c2 ON c.superiorcode = c2.customercode
+; """, conn)
+st.subheader("Dữ liệu khách hàng")
+customer_column_aliases = {
+    "customercode": "Mã khách hàng",
+    "fullname": "Tên khách hàng",
+    "rolename": "Cấp bậc",
+    "superiorcode": "Mã quản lý",
+    "superiorname": "Tên quản lý"
+}
+paginated_dataframe(df_customers, "customer_page", column_aliases=customer_column_aliases)
 
 # File uploader
 uploaded = st.file_uploader("Upload your sales Excel", type=['xlsx','xls'])
 if uploaded:
     df_sales = pd.read_excel(uploaded)
     st.subheader("Sales Data")
-    st.dataframe(df_sales)
+    paginated_dataframe(df_sales, "sales_page")
 
     if st.button("Compute Commissions"):
         with st.spinner("Calculating…"):
             try:
-                conn = get_connection()
-                df_customers = pd.read_sql_query("SELECT * FROM customers", conn)
-                st.subheader("Customer Data")
-                st.dataframe(df_customers)
                 df_merged = pd.merge(
                     df_customers,
                     df_sales,
@@ -85,7 +62,7 @@ if uploaded:
             result = compute_commissions(df_merged)
         st.success("Done!")
         st.subheader("With Commissions")
-        st.dataframe(result)
+        paginated_dataframe(result, "result_page")
 
         # — Download button —
         buffer = BytesIO()
