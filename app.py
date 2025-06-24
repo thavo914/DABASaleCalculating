@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from io import BytesIO
-from app.database import get_connection
-from app.commission import compute_commissions
-from app.ui import paginated_dataframe
+from src.database import get_connection
+from src.commission import compute_commissions
+from src.ui import paginated_dataframe
 
 
 # --- Streamlit UI ---
