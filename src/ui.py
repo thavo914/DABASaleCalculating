@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
+from typing import Optional
 
 
-def paginated_dataframe(df: pd.DataFrame, key_prefix: str, page_size: int = 20, column_aliases: dict = None):
+def paginated_dataframe(df: pd.DataFrame, key_prefix: str, page_size: int = 20, column_aliases: Optional[dict] = None):
     total_rows = len(df)
     if f"{key_prefix}_page_number" not in st.session_state:
         st.session_state[f"{key_prefix}_page_number"] = 1

@@ -1,10 +1,14 @@
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from io import BytesIO
-from src.database import get_connection
-from src.commission import compute_commissions
-from src.ui import paginated_dataframe
+from database import get_connection
+from commission import compute_commissions
+from ui import paginated_dataframe
 
 
 # --- Streamlit UI ---
@@ -66,9 +70,7 @@ if uploaded:
 
         # — Download button —
         buffer = BytesIO()
-        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-            result.to_excel(writer, index=False, sheet_name="Commissions")
-            writer.close()
+        result.to_excel(buffer, index=False, sheet_name="Commissions", engine="openpyxl")
         buffer.seek(0)
 
         st.download_button(
