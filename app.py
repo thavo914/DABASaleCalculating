@@ -31,7 +31,6 @@ customer_column_aliases = {
     "superiorname": "Tên quản lý"
 }
 paginated_dataframe(df_customers, "customer_page", column_aliases=customer_column_aliases)
-
 # File uploader
 uploaded = st.file_uploader("Upload your sales Excel", type=['xlsx','xls'])
 if uploaded:
@@ -48,19 +47,8 @@ if uploaded:
                     on="customercode",
                     how="inner",
                     suffixes=("_cust","_sales")
-                    # (each customer can have multiple sales rows; you can also use "one_to_one" or "many_to_many")
                 )
-                # st.dataframe(df_merged)
-                # df_final = (
-                # df_merged
-                # [["CustomerCode","FullName_cust", "Role_cust", "SuperiorCode_cust","Sales"]]
-                # .rename(columns={
-                #     "FullName_cust":"FullName",
-                #     "Role_cust":"Role",
-                #     "SuperiorCode_cust":"SuperiorCode",
-                # })
-                # )
-                # st.dataframe(df_merged)
+
             except Exception as e:
                 st.error(f"Error loading data from GitHub: {str(e)}")
             result = compute_commissions(df_merged)
@@ -97,3 +85,4 @@ if uploaded:
         ax.set_ylabel("Commission Amount")
         ax.set_title("Commission by Role")
         st.pyplot(fig)
+
