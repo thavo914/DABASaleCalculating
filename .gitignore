@@ -165,6 +165,3 @@ cython_debug/
 
 # Ignore environment files
 .env
-
-# Ignore sensitive data files
-src/database.py
