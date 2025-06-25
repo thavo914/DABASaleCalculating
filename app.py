@@ -14,75 +14,94 @@ from ui import paginated_dataframe
 # --- Streamlit UI ---
 st.title("💼 Sales & Commission Calculator")
 
-conn = get_connection()
-df_customers = pd.read_sql_query("""
-    SELECT c.customercode, c.fullname, r.rolename, c.superiorcode
-    , c2.fullname AS superiorname
-    FROM public.customers c
-    INNER JOIN roles r ON c.roleid = r.id
-    LEFT JOIN public.customers c2 ON c.superiorcode = c2.customercode
-; """, conn)
-st.subheader("Dữ liệu khách hàng")
-customer_column_aliases = {
-    "customercode": "Mã khách hàng",
-    "fullname": "Tên khách hàng",
-    "rolename": "Cấp bậc",
-    "superiorcode": "Mã quản lý",
-    "superiorname": "Tên quản lý"
-}
-paginated_dataframe(df_customers, "customer_page", column_aliases=customer_column_aliases)
+
 # File uploader
 uploaded = st.file_uploader("Upload your sales Excel", type=['xlsx','xls'])
 if uploaded:
     df_sales = pd.read_excel(uploaded)
     st.subheader("Sales Data")
     st.dataframe(df_sales)
+    rename_map = {
+        str(df_sales.columns[0]): "customercode",
+        str(df_sales.columns[11]): "ordercode",
+        str(df_sales.columns[12]): "createddate",
+        str(df_sales.columns[13]): "staffname",
+        str(df_sales.columns[15]): "totalprice",
+        str(df_sales.columns[16]): "discountvalue",
+        str(df_sales.columns[17]): "revenue",
 
-    if st.button("Compute Commissions"):
-        with st.spinner("Calculating…"):
-            try:
-                df_merged = pd.merge(
-                    df_customers,
-                    df_sales,
-                    on="customercode",
-                    how="inner",
-                    suffixes=("_cust","_sales")
-                )
+    }
+    df_sales.rename(columns=rename_map, inplace=True)
+    st.dataframe(df_sales)
 
-            except Exception as e:
-                st.error(f"Error loading data from GitHub: {str(e)}")
-            result = compute_commissions(df_merged)
-        st.success("Done!")
-        st.subheader("With Commissions")
-        paginated_dataframe(result, "result_page")
+    if st.button("Import Sales Data"):
+        try:
+            conn = get_connection()
+            cur = conn.cursor()
+            for _, row in df_sales.iterrows():
+                cur.execute("""
+                    INSERT INTO Sales (customercode, ordercode, createddate, staffname, totalprice, discountvalue, revenue)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    row["customercode"],
+                    row["ordercode"],
+                    row["createddate"],
+                    row["staffname"],
+                    row["totalprice"],
+                    row["discountvalue"],
+                    row["revenue"]
+                ))
+            conn.commit()
+            cur.close()
+            conn.close()
+            st.success("Sales data imported successfully!")
+        except Exception as e:
+            st.error(f"Error importing sales data: {e}")
 
-        # — Download button —
-        buffer = BytesIO()
-        result.to_excel(buffer, index=False, sheet_name="Commissions", engine="openpyxl")
-        buffer.seek(0)
 
-        st.download_button(
-            label="📥 Download results as Excel",
-            data=buffer,
-            file_name="commission_results.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+
+        # # — Download button —
+        # buffer = BytesIO()
+        # result.to_excel(buffer, index=False, sheet_name="Commissions", engine="openpyxl")
+        # buffer.seek(0)
+
+        # st.download_button(
+        #     label="📥 Download results as Excel",
+        #     data=buffer,
+        #     file_name="commission_results.xlsx",
+        #     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        # )
 
         # Summary metrics
-        total_sales   = result['Sales'].sum()
-        total_override= result['OverrideSales'].sum()
-        total_comm    = result['PersonalComm'].sum() + result['OverrideComm'].sum()
-        st.markdown(f"""
-        **System Sales:** {total_sales:,.0f}  
-        **System Override Base:** {total_override:,.0f}  
-        **Total Payout (comm+override):** {total_comm:,.0f}
-        """)
+        # total_sales   = result['Sales'].sum()
+        # total_override= result['OverrideSales'].sum()
+        # total_comm    = result['PersonalComm'].sum() + result['OverrideComm'].sum()
+        # st.markdown(f"""
+        # **System Sales:** {total_sales:,.0f}  
+        # **System Override Base:** {total_override:,.0f}  
+        # **Total Payout (comm+override):** {total_comm:,.0f}
+        # """)
 
         # Simple bar chart of commissions by Role
-        fig, ax = plt.subplots()
-        summary = result.groupby('Role')[['PersonalComm','OverrideComm']].sum()
-        summary.plot.bar(ax=ax)
-        ax.set_ylabel("Commission Amount")
-        ax.set_title("Commission by Role")
-        st.pyplot(fig)
+        # fig, ax = plt.subplots()
+        # summary = result.groupby('Role')[['PersonalComm','OverrideComm']].sum()
+        # summary.plot.bar(ax=ax)
+        # ax.set_ylabel("Commission Amount")
+        # ax.set_title("Commission by Role")
+        # st.pyplot(fig)
+
+
+# Sample data
+df_sales = pd.DataFrame({
+    "createddate": ["2024-05-01", "2024-05-15", "2024-06-10", "2024-06-20"]
+})
+
+# Convert to datetime
+df_sales["createddate"] = pd.to_datetime(df_sales["createddate"])
+
+# Create year_month column
+df_sales["year_month"] = df_sales["createddate"].dt.to_period("M")
+
+available_months = df_sales["year_month"].astype(str).unique()
+selected_month = st.selectbox("Select month", sorted(available_months, reverse=True))
 
