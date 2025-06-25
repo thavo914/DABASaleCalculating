@@ -9,7 +9,6 @@ from io import BytesIO
 from database import get_connection
 from commission import compute_commissions
 from ui import paginated_dataframe
-import psycopg2
 
 
 # --- Streamlit UI ---
@@ -32,8 +31,6 @@ customer_column_aliases = {
     "superiorname": "Tên quản lý"
 }
 paginated_dataframe(df_customers, "customer_page", column_aliases=customer_column_aliases)
-st.markdown('[🌐 Visit Google](https://www.google.com)')
-
 # File uploader
 uploaded = st.file_uploader("Upload your sales Excel", type=['xlsx','xls'])
 if uploaded:
@@ -88,47 +85,4 @@ if uploaded:
         ax.set_ylabel("Commission Amount")
         ax.set_title("Commission by Role")
         st.pyplot(fig)
-
-st.title("👤 Customer Management")
-
-# Form for creating/updating customer
-with st.form("customer_form"):
-    customercode = st.text_input("Customer Code")
-    fullname = st.text_input("Full Name")
-    roleid = st.number_input("Role ID", min_value=1, step=1)
-    superiorcode = st.text_input("Superior Code (optional)", value="")
-    submitted = st.form_submit_button("Save Customer")
-
-    if submitted:
-        try:
-            conn = get_connection()
-            cur = conn.cursor()
-            # Upsert logic: update if exists, else insert
-            cur.execute("""
-                INSERT INTO public.customers (customercode, fullname, roleid, superiorcode)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (customercode) DO UPDATE
-                SET fullname=EXCLUDED.fullname, roleid=EXCLUDED.roleid, superiorcode=EXCLUDED.superiorcode
-            """, (customercode, fullname, roleid, superiorcode or None))
-            conn.commit()
-            st.success("Customer saved successfully!")
-        except Exception as e:
-            st.error(f"Error: {e}")
-        finally:
-            cur.close()
-            conn.close()
-
-# Show all customers
-st.markdown("---")
-st.subheader("All Customers")
-try:
-    conn = get_connection()
-    df = st.experimental_data_editor(
-        st.dataframe(
-            pd.read_sql_query("SELECT * FROM public.customers", conn)
-        )
-    )
-    conn.close()
-except Exception as e:
-    st.error(f"Error loading customers: {e}")
 
