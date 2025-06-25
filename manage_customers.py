@@ -1,6 +1,10 @@
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+
 import streamlit as st
 import psycopg2
-from src.database import get_connection
+from database import get_connection
 import pandas as pd
 
 st.title("👤 Customer Management")
