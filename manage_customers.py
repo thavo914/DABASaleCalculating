@@ -3,8 +3,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 import streamlit as st
-import psycopg2
-from database import get_connection
+from database import get_sqlalchemy_engine
 import pandas as pd
 
 st.title("👤 Customer Management")
@@ -22,20 +21,20 @@ with st.form("customer_form"):
 
     if submitted:
         try:
-            conn = get_connection()
-            cur = conn.cursor()
+            engine = get_sqlalchemy_engine()
+            cur = engine.cursor()
             # Upsert logic: update if exists, else insert
             cur.execute("""
                 INSERT INTO public.customers (customercode, fullname, roleid, superiorcode)
                 VALUES (%s, %s, %s, %s)
             """, (customercode, fullname, roleid, superiorcode or None))
-            conn.commit()
+            engine.commit()
             st.success("Customer saved successfully!")
         except Exception as e:
             st.error(f"Error: {e}")
         finally:
             cur.close()
-            conn.close()
+            engine.close()
 
 st.markdown("---")
 st.subheader("Import Customers from Excel")
@@ -54,8 +53,8 @@ if uploaded_file:
         st.dataframe(df_import)  # Preview the data
 
         if st.button("Import Customers"):
-            conn = get_connection()
-            cur = conn.cursor()
+            engine = get_sqlalchemy_engine()
+            cur = engine.cursor()
             for _, row in df_import.iterrows():
                 cur.execute("""
                     INSERT INTO public.customers (customercode, fullname, roleid, superiorcode)
@@ -66,9 +65,9 @@ if uploaded_file:
                     role_name_to_id.get(str(row["role"]), None),
                     row.get("superiorcode", None)
                 ))
-            conn.commit()
+            engine.commit()
             cur.close()
-            conn.close()
+            engine.close()
             st.success("Customers imported successfully!")
     except Exception as e:
         st.error(f"Error importing customers: {e}")
@@ -77,14 +76,14 @@ if uploaded_file:
 st.markdown("---")
 st.subheader("Dữ liệu khách hàng")
 try:
-    conn = get_connection()
+    engine = get_sqlalchemy_engine()
     df_customers = pd.read_sql_query("""
         SELECT c.customercode, c.fullname, r.rolename, c.superiorcode
         , c2.fullname AS superiorname
         FROM public.customers c
         INNER JOIN roles r ON c.roleid = r.id
         LEFT JOIN public.customers c2 ON c.superiorcode = c2.customercode
-    ; """, conn)
+    ; """, engine)
     st.data_editor(
         df_customers,
         column_config={
@@ -95,6 +94,5 @@ try:
             "superiorname": st.column_config.Column(label="Tên quản lý"),
         }
     )
-    conn.close()
 except Exception as e:
     st.error(f"Error loading customers: {e}")
