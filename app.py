@@ -156,7 +156,7 @@ if st.button("Tính hoa hồng"):
     result = compute_commissions(df_monthly_revenue)
 
     result_display = result.copy()
-    for col in ['sales', 'bonus_value', 'personalcomm', 'overridecomm']:
+    for col in ['sales', 'overridesales', 'personalcomm', 'overridecomm']:
         if col in result_display.columns:
             result_display[col] = result_display[col].apply(lambda x: f"{x:,.0f}")
 
