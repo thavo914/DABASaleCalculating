@@ -39,8 +39,8 @@ if uploaded:
 
     if st.button("Import Sales Data"):
         try:
-            conn = get_connection()
-            cur = conn.cursor()
+            engine = get_sqlalchemy_engine()
+            cur = engine.cursor()
             for _, row in df_sales.iterrows():
                 cur.execute("""
                     INSERT INTO Sales (customercode, ordercode, createddate, staffname, totalprice, discountvalue, revenue)
@@ -54,9 +54,9 @@ if uploaded:
                     row["discountvalue"],
                     row["revenue"]
                 ))
-            conn.commit()
+            engine.commit()
             cur.close()
-            conn.close()
+            engine.close()
             st.success("Sales data imported successfully!")
         except Exception as e:
             st.error(f"Error importing sales data: {e}")
@@ -94,18 +94,40 @@ start_date = pd.Period(selected_month).start_time
 end_date = pd.Period(selected_month).end_time
 
 query = f"""
-SELECT c1.customercode,
-       c1.fullname,
-       r.rolename,
-       c1.superiorcode,
-       c2.fullname    AS superiorname,
-       SUM(s.revenue) as sales
-FROM public.sales s
-         INNER JOIN public.customers c1 ON c1.customercode = s.customercode
-         INNER JOIN public.roles r ON c1.roleid = r.id
-         LEFT JOIN public.customers c2 ON c1.superiorcode = c2.customercode
-WHERE s.createddate >= '{start_date}'
-  AND s.createddate <= '{end_date}'
+WITH sales_in_period AS (
+    SELECT customercode
+    FROM public.sales
+    WHERE createddate >= '{start_date}'
+      AND createddate <= '{end_date}'
+    GROUP BY customercode
+),
+relevant_customers AS (
+    -- All with sales
+    SELECT c.customercode
+    FROM public.customers c
+    INNER JOIN sales_in_period s ON c.customercode = s.customercode
+    UNION
+    -- All who are superior of someone with sales
+    SELECT c2.superiorcode
+    FROM public.customers c2
+    INNER JOIN sales_in_period s ON c2.customercode = s.customercode
+    WHERE c2.superiorcode IS NOT NULL
+)
+SELECT
+    c1.customercode,
+    c1.fullname,
+    r.rolename,
+    c1.superiorcode,
+    c2.fullname AS superiorname,
+    COALESCE(SUM(s.revenue), 0) AS sales
+FROM public.customers c1
+INNER JOIN relevant_customers rc ON c1.customercode = rc.customercode
+INNER JOIN public.roles r ON c1.roleid = r.id
+LEFT JOIN public.customers c2 ON c1.superiorcode = c2.customercode
+LEFT JOIN public.sales s
+    ON c1.customercode = s.customercode
+    AND s.createddate >= '{start_date}'
+    AND s.createddate <= '{end_date}'
 GROUP BY c1.customercode, c1.fullname, r.rolename, c1.superiorcode, c2.fullname
 """
 
