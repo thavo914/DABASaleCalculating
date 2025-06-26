@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from io import BytesIO
-from database import get_connection
+from database import get_sqlalchemy_engine
 from commission import compute_commissions, calculate_quarterly_bonus
 from ui import paginated_dataframe
 from pandas.tseries.offsets import MonthEnd
@@ -86,7 +86,7 @@ df_sales["year_month"] = df_sales["createddate"].dt.to_period("M")
 
 available_months = df_sales["year_month"].astype(str).unique()
 selected_month = st.selectbox("2. Chọn doanh thu theo tháng", sorted(available_months))
-conn = get_connection()
+engine = get_sqlalchemy_engine()
 
 # After selected_month is set
 # Convert selected_month (e.g., "2024-06") to start and end dates
@@ -109,7 +109,7 @@ WHERE s.createddate >= '{start_date}'
 GROUP BY c1.customercode, c1.fullname, r.rolename, c1.superiorcode, c2.fullname
 """
 
-df_monthly_revenue = pd.read_sql_query(query, conn)
+df_monthly_revenue = pd.read_sql_query(query, engine)
 # Insert selectedmonth column by index
 df_monthly_revenue.insert(0, 'selectedmonth', selected_month)
 df_monthly_revenue_display = df_monthly_revenue.copy()
@@ -222,7 +222,7 @@ if start_date and end_date:
     WHERE s.createddate >= '{start_date.strftime('%Y-%m-%d')}'
     AND s.createddate <= '{end_date.strftime('%Y-%m-%d')}'
     GROUP BY c1.customercode, c1.fullname, r.rolename
-    """, conn)
+    """, engine)
     # Insert selectedmonth column by index
     df_quarter.insert(0, 'quarteryear', selected_quarter_year)
     df_quarter_display = df_quarter.copy()
@@ -242,6 +242,10 @@ if start_date and end_date:
     if st.button("Tính thưởng quý (Quarterly Bonus)"):
 
         df_with_bonus = calculate_quarterly_bonus(df_quarter)
+        df_with_bonus_display = df_with_bonus.copy()
+        for col in ['sales', 'bonus_value']:
+            if col in df_with_bonus_display.columns:
+                df_with_bonus_display[col] = df_with_bonus_display[col].apply(lambda x: f"{x:,.0f}")
         st.success("Done!")
         st.subheader(f"Thưởng quý theo doanh số - {selected_quarter_year}")
         result_column_aliases = {
@@ -256,7 +260,7 @@ if start_date and end_date:
         "bonus_percentage": "Tỉ lệ thưởng quý",
         "bonus_value": "Số tiền thưởng",
         }
-        paginated_dataframe(df_with_bonus, "result_page", column_aliases=result_column_aliases)
+        paginated_dataframe(df_with_bonus_display, "result_page", column_aliases=result_column_aliases)
         # Download button for bonus results
         buffer_bonus = BytesIO()
         df_with_bonus.to_excel(buffer_bonus, index=False, sheet_name="QuarterlyBonus", engine="openpyxl")
