@@ -23,3 +23,36 @@ def compute_commissions(df):
     df['personalcomm'] = df['sales'] * df['commissionrate']
     df['overridecomm'] = df['overridesales'] * df['overriderate']
     return df 
+
+def calculate_quarterly_bonus(df):
+    """
+    Adds 'bonus_percentage' and 'bonus_value' columns to the input DataFrame
+    based on the sales tiers defined in a network dictionary.
+    The output format matches the commission output: all original columns, with bonus columns appended at the end.
+    """
+    network = [
+        {'lower': 45_000_000, 'upper': 100_000_000, 'percent': 0.02},
+        {'lower': 100_000_000, 'upper': 250_000_000, 'percent': 0.025},
+        {'lower': 250_000_000, 'upper': 450_000_000, 'percent': 0.03},
+        {'lower': 450_000_000, 'upper': 800_000_000, 'percent': 0.035},
+        {'lower': 800_000_000, 'upper': 1_500_000_000, 'percent': 0.04},
+        {'lower': 1_500_000_000, 'upper': 3_000_000_000, 'percent': 0.045},
+        {'lower': 3_000_000_000, 'upper': float('inf'), 'percent': 0.05},
+    ]
+    bonus_percentages = []
+    bonus_values = []
+    for _, row in df.iterrows():
+        sales = row['sales']
+        percent = 0.0
+        for tier in network:
+            if tier['lower'] <= sales < tier['upper']:
+                percent = tier['percent']
+                break
+        bonus_percentages.append(percent)
+        bonus_values.append(sales * percent)
+    df['bonus_percentage'] = bonus_percentages
+    df['bonus_value'] = bonus_values
+    # Ensure bonus columns are at the end
+    cols = [col for col in df.columns if col not in ['bonus_percentage', 'bonus_value']] + ['bonus_percentage', 'bonus_value']
+    df = df[cols]
+    return df 
