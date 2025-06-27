@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from io import BytesIO
 from database import get_sqlalchemy_engine
+from sqlalchemy import text
 from commission import compute_commissions, calculate_quarterly_bonus
 from ui import paginated_dataframe
 from pandas.tseries.offsets import MonthEnd
@@ -35,28 +36,24 @@ if uploaded:
 
     }
     df_sales.rename(columns=rename_map, inplace=True)
-    st.dataframe(df_sales)
 
     if st.button("Import Sales Data"):
         try:
             engine = get_sqlalchemy_engine()
-            cur = engine.cursor()
-            for _, row in df_sales.iterrows():
-                cur.execute("""
-                    INSERT INTO Sales (customercode, ordercode, createddate, staffname, totalprice, discountvalue, revenue)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    row["customercode"],
-                    row["ordercode"],
-                    row["createddate"],
-                    row["staffname"],
-                    row["totalprice"],
-                    row["discountvalue"],
-                    row["revenue"]
-                ))
-            engine.commit()
-            cur.close()
-            engine.close()
+            with engine.begin() as conn:
+                for _, row in df_sales.iterrows():
+                    conn.execute(text("""
+                        INSERT INTO Sales (customercode, ordercode, createddate, staffname, totalprice, discountvalue, revenue)
+                        VALUES (:customercode, :ordercode, :createddate, :staffname, :totalprice, :discountvalue, :revenue)
+                    """), {
+                        "customercode": row["customercode"],
+                        "ordercode": row["ordercode"],
+                        "createddate": row["createddate"],
+                        "staffname": row["staffname"],
+                        "totalprice": row["totalprice"],
+                        "discountvalue": row["discountvalue"],
+                        "revenue": row["revenue"]
+                    })
             st.success("Sales data imported successfully!")
         except Exception as e:
             st.error(f"Error importing sales data: {e}")

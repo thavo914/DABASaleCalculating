@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 import streamlit as st
 from database import get_sqlalchemy_engine
+from sqlalchemy import text
 import pandas as pd
 
 st.title("👤 Customer Management")
@@ -22,19 +23,20 @@ with st.form("customer_form"):
     if submitted:
         try:
             engine = get_sqlalchemy_engine()
-            cur = engine.cursor()
-            # Upsert logic: update if exists, else insert
-            cur.execute("""
-                INSERT INTO public.customers (customercode, fullname, roleid, superiorcode)
-                VALUES (%s, %s, %s, %s)
-            """, (customercode, fullname, roleid, superiorcode or None))
-            engine.commit()
+            with engine.begin() as conn:
+                # Upsert logic: update if exists, else insert
+                conn.execute(text("""
+                    INSERT INTO public.customers (customercode, fullname, roleid, superiorcode)
+                    VALUES (:customercode, :fullname, :roleid, :superiorcode)
+                """), {
+                    "customercode": customercode,
+                    "fullname": fullname,
+                    "roleid": roleid,
+                    "superiorcode": superiorcode or None
+                })
             st.success("Customer saved successfully!")
         except Exception as e:
             st.error(f"Error: {e}")
-        finally:
-            cur.close()
-            engine.close()
 
 st.markdown("---")
 st.subheader("Import Customers from Excel")
@@ -54,20 +56,17 @@ if uploaded_file:
 
         if st.button("Import Customers"):
             engine = get_sqlalchemy_engine()
-            cur = engine.cursor()
-            for _, row in df_import.iterrows():
-                cur.execute("""
-                    INSERT INTO public.customers (customercode, fullname, roleid, superiorcode)
-                    VALUES (%s, %s, %s, %s)
-                """, (
-                    row["customercode"],
-                    row["fullname"],
-                    role_name_to_id.get(str(row["role"]), None),
-                    row.get("superiorcode", None)
-                ))
-            engine.commit()
-            cur.close()
-            engine.close()
+            with engine.begin() as conn:
+                for _, row in df_import.iterrows():
+                    conn.execute(text("""
+                        INSERT INTO public.customers (customercode, fullname, roleid, superiorcode)
+                        VALUES (:customercode, :fullname, :roleid, :superiorcode)
+                    """), {
+                        "customercode": row["customercode"],
+                        "fullname": row["fullname"],
+                        "roleid": role_name_to_id.get(str(row["role"]), None),
+                        "superiorcode": row.get("superiorcode", None)
+                    })
             st.success("Customers imported successfully!")
     except Exception as e:
         st.error(f"Error importing customers: {e}")
