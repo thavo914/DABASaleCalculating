@@ -16,7 +16,7 @@ with st.form("customer_form"):
     customercode = st.text_input("Mã khách hàng")
     fullname = st.text_input("Tên khách hàng")
     roleid = st.number_input("Cấp bậc", min_value=1, step=1)
-    st.caption("**Cấp bậc:** 1 = Catalyst, 2 = Visionary, 3 = Trailblazer")
+    st.caption("**Cấp bậc:** 1 = Catalyst, 2 = Visionary, 3 = Trailblazer, 4 = Agent, 5 = Agent 1, 6 = Agent 2, 7 = Agent 3, 8 = Agent 4, 9 = Agent 5")
     superiorcode = st.text_input("Mã quản lý", value="")
     submitted = st.form_submit_button("Lưu")
 

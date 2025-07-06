@@ -2,6 +2,12 @@ network = {
     'Catalyst':    {'comm_rate': .35, 'override_rate': 0,   'level': 1},
     'Visionary':   {'comm_rate': .4,  'override_rate': .05,'level': 2},
     'Trailblazer': {'comm_rate': .4,  'override_rate': .05,'level': 3},
+    'Agent':       {'comm_rate': .50, 'override_rate': 0,   'level': 4},
+    'Agent 1':     {'comm_rate': .45, 'override_rate': 0,   'level': 5},
+    'Agent 2':     {'comm_rate': .40, 'override_rate': 0,   'level': 6},
+    'Agent 3':     {'comm_rate': .35, 'override_rate': 0,   'level': 7},
+    'Agent 4':     {'comm_rate': .30, 'override_rate': 0,   'level': 8},
+    'Agent 5':     {'comm_rate': .25, 'override_rate': 0,   'level': 9},
 }
 
 def calculate_OverrideSales(df):
@@ -10,7 +16,7 @@ def calculate_OverrideSales(df):
         role_staff = df[df['rolename'] == role]
         for _, staff in role_staff.iterrows():
             subs = df['superiorcode'] == staff['customercode']
-            subordinate_sales = df.loc[subs, 'sales'].sum()
+            subordinate_sales = df.loc[subs, 'revenue'].sum()
             subordinate_override = df.loc[subs, 'overridesales'].sum()
             total_override = subordinate_sales + subordinate_override
             df.loc[df['customercode'] == staff['customercode'], 'overridesales'] = total_override
@@ -20,7 +26,7 @@ def compute_commissions(df):
     df = calculate_OverrideSales(df)
     df['commissionrate']     = df['rolename'].map(lambda r: network[r]['comm_rate'])
     df['overriderate']     = df['rolename'].map(lambda r: network[r]['override_rate'])
-    df['personalcomm'] = df['sales'] * df['commissionrate']
+    df['personalcomm'] = df['totalprice'] * df['commissionrate'] 
     df['overridecomm'] = df['overridesales'] * df['overriderate']
     return df 
 
@@ -42,7 +48,7 @@ def calculate_quarterly_bonus(df):
     bonus_percentages = []
     bonus_values = []
     for _, row in df.iterrows():
-        sales = row['sales']
+        sales = row['revenue']
         percent = 0.0
         for tier in network:
             if tier['lower'] <= sales < tier['upper']:
