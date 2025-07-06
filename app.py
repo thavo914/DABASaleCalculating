@@ -51,7 +51,7 @@ if uploaded:
                         "createddate": row["createddate"],
                         "staffname": row["staffname"],
                         "totalprice": row["totalprice"],
-                        "discountvalue": row["discountvalue"],
+                        "discountvalue": abs(row["discountvalue"]),
                         "revenue": row["revenue"]
                     })
             st.success("Sales data imported successfully!")
@@ -116,7 +116,9 @@ SELECT
     r.rolename,
     c1.superiorcode,
     c2.fullname AS superiorname,
-    COALESCE(SUM(s.revenue), 0) AS sales
+    COALESCE(SUM(s.totalprice), 0) AS totalprice,
+    COALESCE(SUM(s.discountvalue), 0) AS discountvalue,
+    COALESCE(SUM(s.revenue), 0) AS revenue
 FROM public.customers c1
 INNER JOIN relevant_customers rc ON c1.customercode = rc.customercode
 INNER JOIN public.roles r ON c1.roleid = r.id
@@ -132,7 +134,9 @@ df_monthly_revenue = pd.read_sql_query(query, engine)
 # Insert selectedmonth column by index
 df_monthly_revenue.insert(0, 'selectedmonth', selected_month)
 df_monthly_revenue_display = df_monthly_revenue.copy()
-df_monthly_revenue_display['sales'] = df_monthly_revenue_display['sales'].apply(lambda x: f"{x:,.0f}")
+for col in ['totalprice', 'discountvalue', 'revenue']:
+    if col in df_monthly_revenue_display.columns:
+        df_monthly_revenue_display[col] = df_monthly_revenue_display[col].apply(lambda x: f"{x:,.0f}")
 
 st.data_editor(
     df_monthly_revenue_display,
@@ -143,7 +147,9 @@ st.data_editor(
         "superiorcode": st.column_config.Column(label="Mã quản lý"),
         "superiorname": st.column_config.Column(label="Tên quản lý"),
         "selectedmonth": st.column_config.Column(label="Tháng"),
-        "sales": st.column_config.Column(label="Doanh số cá nhân"),
+        "totalprice": st.column_config.Column(label="Tổng tiền hàng"),
+        "discountvalue": st.column_config.Column(label="Chiết khấu"),
+        "revenue": st.column_config.Column(label="Doanh số cá nhân"),
     }
 )
 
@@ -153,7 +159,7 @@ if st.button("Tính hoa hồng"):
     result = compute_commissions(df_monthly_revenue)
 
     result_display = result.copy()
-    for col in ['sales', 'overridesales', 'personalcomm', 'overridecomm']:
+    for col in ['totalprice', 'discountvalue', 'revenue', 'overridesales', 'personalcomm', 'overridecomm']:
         if col in result_display.columns:
             result_display[col] = result_display[col].apply(lambda x: f"{x:,.0f}")
 
@@ -164,7 +170,9 @@ if st.button("Tính hoa hồng"):
     "superiorcode": "Mã quản lý",
     "superiorname": "Tên quản lý",
     "selectedmonth": "Tháng",
-    "sales": "Doanh số",
+    "totalprice": "Tổng tiền hàng",
+    "discountvalue": "Chiết khấu",
+    "revenue": "Doanh số cá nhân",
     "overridesales": "Doanh số vượt cấp (từ cấp dưới)",
     "commissionrate": "Tỷ lệ hoa hồng",
     "overriderate": "Tỷ lệ hoa hồng vượt cấp",
@@ -188,7 +196,7 @@ if st.button("Tính hoa hồng"):
     )
 
     # Summary metrics
-    total_sales   = result['sales'].sum()
+    total_sales   = result['totalprice'].sum()
     total_override= result['overridesales'].sum()
     total_comm    = result['personalcomm'].sum() + result['overridecomm'].sum()
     st.markdown(f"""
@@ -234,7 +242,7 @@ if start_date and end_date:
     SELECT c1.customercode,
         c1.fullname,
         r.rolename,
-        SUM(s.revenue) as sales
+        SUM(s.revenue) as revenue
     FROM public.sales s
             INNER JOIN public.customers c1 ON c1.customercode = s.customercode
             INNER JOIN public.roles r ON c1.roleid = r.id
@@ -245,7 +253,7 @@ if start_date and end_date:
     # Insert selectedmonth column by index
     df_quarter.insert(0, 'quarteryear', selected_quarter_year)
     df_quarter_display = df_quarter.copy()
-    df_quarter_display['sales'] = df_quarter_display['sales'].apply(lambda x: f"{x:,.0f}")
+    df_quarter_display['revenue'] = df_quarter_display['revenue'].apply(lambda x: f"{x:,.0f}")
 
     st.data_editor(
         df_quarter_display,
@@ -254,7 +262,7 @@ if start_date and end_date:
             "fullname": st.column_config.Column(label="Tên khách hàng"),
             "rolename": st.column_config.Column(label="Cấp bậc"),
             "quarteryear": st.column_config.Column(label="Quý"),
-            "sales": st.column_config.Column(label="Doanh số"),
+            "revenue": st.column_config.Column(label="Doanh số"),
         }
     )
 # Calculate and display quarterly bonus
@@ -262,7 +270,7 @@ if start_date and end_date:
 
         df_with_bonus = calculate_quarterly_bonus(df_quarter)
         df_with_bonus_display = df_with_bonus.copy()
-        for col in ['sales', 'bonus_value']:
+        for col in ['revenue', 'bonus_value']:
             if col in df_with_bonus_display.columns:
                 df_with_bonus_display[col] = df_with_bonus_display[col].apply(lambda x: f"{x:,.0f}")
         st.success("Done!")
@@ -275,7 +283,7 @@ if start_date and end_date:
         "superiorcode": "Mã quản lý",
         "superiorname": "Tên quản lý",
         "selectedmonth": "Tháng",
-        "sales": "Doanh số theo quý",
+        "revenue": "Doanh số theo quý",
         "bonus_percentage": "Tỉ lệ thưởng quý",
         "bonus_value": "Số tiền thưởng",
         }
