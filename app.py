@@ -183,9 +183,13 @@ if st.button("Tính hoa hồng"):
     st.subheader("Hoa hồng theo hệ thống")
     paginated_dataframe(result_display, "result_page", column_aliases=result_column_aliases)
 
+
     # — Download button —
     buffer = BytesIO()
-    result.to_excel(buffer, index=False, sheet_name="Commissions", engine="openpyxl")
+    # Create a copy with aliases for download
+    result_download = result_display.copy()
+    result_download.rename(columns=result_column_aliases, inplace=True)
+    result_download.to_excel(buffer, index=False, sheet_name="Commissions", engine="openpyxl")
     buffer.seek(0)
 
     st.download_button(
@@ -288,9 +292,12 @@ if start_date and end_date:
         "bonus_value": "Số tiền thưởng",
         }
         paginated_dataframe(df_with_bonus_display, "result_page", column_aliases=result_column_aliases)
+
         # Download button for bonus results
         buffer_bonus = BytesIO()
-        df_with_bonus.to_excel(buffer_bonus, index=False, sheet_name="QuarterlyBonus", engine="openpyxl")
+        df_with_bonus_download = df_with_bonus_display.copy()
+        df_with_bonus_download.rename(columns=result_column_aliases, inplace=True)
+        df_with_bonus_download.to_excel(buffer_bonus, index=False, sheet_name="QuarterlyBonus", engine="openpyxl")
         buffer_bonus.seek(0)
         st.download_button(
             label="📥 Download quarterly bonus as Excel",
