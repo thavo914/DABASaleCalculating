@@ -24,17 +24,27 @@ with st.form("customer_form"):
         try:
             engine = get_sqlalchemy_engine()
             with engine.begin() as conn:
-                # Upsert logic: update if exists, else insert
-                conn.execute(text("""
-                    INSERT INTO public.customers (customercode, fullname, roleid, superiorcode)
-                    VALUES (:customercode, :fullname, :roleid, :superiorcode)
-                """), {
-                    "customercode": customercode,
-                    "fullname": fullname,
-                    "roleid": roleid,
-                    "superiorcode": superiorcode or None
-                })
-            st.success("Customer saved successfully!")
+                # Check if customer code already exists
+                existing_customer = pd.read_sql_query(
+                    "SELECT customercode FROM public.customers WHERE customercode = :customercode", 
+                    conn, 
+                    params={"customercode": customercode}
+                )
+                
+                if not existing_customer.empty:
+                    st.error(f"Customer code '{customercode}' already exists in the database. Please use a different code.")
+                else:
+                    # Insert new customer
+                    conn.execute(text("""
+                        INSERT INTO public.customers (customercode, fullname, roleid, superiorcode)
+                        VALUES (:customercode, :fullname, :roleid, :superiorcode)
+                    """), {
+                        "customercode": customercode,
+                        "fullname": fullname,
+                        "roleid": roleid,
+                        "superiorcode": superiorcode or None
+                    })
+                    st.success("Customer saved successfully!")
         except Exception as e:
             st.error(f"Error: {e}")
 
@@ -57,17 +67,43 @@ if uploaded_file:
         if st.button("Import Customers"):
             engine = get_sqlalchemy_engine()
             with engine.begin() as conn:
+                # Get existing customer codes from database
+                existing_codes = pd.read_sql_query(
+                    "SELECT customercode FROM public.customers", 
+                    conn
+                )['customercode'].tolist()
+                
+                # Filter out duplicates
+                new_customers = []
+                duplicate_count = 0
+                
                 for _, row in df_import.iterrows():
-                    conn.execute(text("""
-                        INSERT INTO public.customers (customercode, fullname, roleid, superiorcode)
-                        VALUES (:customercode, :fullname, :roleid, :superiorcode)
-                    """), {
-                        "customercode": row["customercode"],
-                        "fullname": row["fullname"],
-                        "roleid": role_name_to_id.get(str(row["role"]), None),
-                        "superiorcode": row.get("superiorcode", None)
-                    })
-            st.success("Customers imported successfully!")
+                    if row["customercode"] not in existing_codes:
+                        new_customers.append({
+                            "customercode": row["customercode"],
+                            "fullname": row["fullname"],
+                            "roleid": role_name_to_id.get(str(row["role"]), None),
+                            "superiorcode": row.get("superiorcode", None)
+                        })
+                    else:
+                        duplicate_count += 1
+                
+                # Insert only new customers
+                if new_customers:
+                    for customer in new_customers:
+                        conn.execute(text("""
+                            INSERT INTO public.customers (customercode, fullname, roleid, superiorcode)
+                            VALUES (:customercode, :fullname, :roleid, :superiorcode)
+                        """), customer)
+                
+                # Show results
+                if duplicate_count > 0:
+                    st.warning(f"Found {duplicate_count} duplicate customer(s) that were skipped.")
+                
+                if new_customers:
+                    st.success(f"Successfully imported {len(new_customers)} new customer(s)!")
+                else:
+                    st.info("No new customers to import - all were duplicates.")
     except Exception as e:
         st.error(f"Error importing customers: {e}")
 
